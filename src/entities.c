@@ -308,38 +308,6 @@ void gameOverState(){
 
 
 
-int getBaudrate(){
-	GPIO_PinModeSet(gpioPortC, 0, gpioModeInput, 0);
-
-	int cnt=0;
-	while((GPIO_PC_DIN & (1<<0))!=0);
-	for(int i=0;i<5;i++){
-		while((GPIO_PC_DIN & (1<<0))!=1){
-			cnt++;
-		}
-		while((GPIO_PC_DIN & (1<<0))!=0){
-			cnt++;
-		}
-	}
-	SegmentLCD_Number(cnt);
-//GPIO_PinInGet(gpioPortC,0)!=1
-	return cnt;
-	/*
-	CMU_ClockDivSet(cmuClock_HFPER, cmuClkDiv_1);
-	CMU_ClockEnable(cmuClock_TIMER1, true);
-	TIMER_InitCC_TypeDef TIMER1_Init = TIMER_INITCC_DEFAULT;
-	TIMER1_Init.cmoa=timerOutputActionNone;
-	TIMER1_Init.cofoa=timerOutputActionNone;
-	TIMER1_Init.prsInput=true;
-	TIMER1_Init.prsSel=timerPRSSELCh0;
-	TIMER1_Init.eventCtrl=timerEventFalling;
-	TIMER1_Init.mode=timerCCModeCapture;
-	TIMER_InitCC(TIMER1,0 ,&TIMER1_Init);
-	TIMER_IntClear(TIMER1, TIMER_IF_CC0);
-	TIMER_IntEnable(TIMER1, TIMER_IF_CC0);
-	NVIC_EnableIRQ(TIMER1_IRQn); //NVIC törli magától a flaget, a periféria nem
-	*/
-}
 
 /*
  * USART1 inicializalasa a PS2-es billentyuzethez
@@ -349,9 +317,10 @@ void initUSART1(){
 	GPIO_PinModeSet(gpioPortD, 1, gpioModeInput, 0);
 
 	USART_InitAsync_TypeDef USART1_init = USART_INITASYNC_DEFAULT;
-	USART1_init.baudrate=10000;
+	USART1_init.baudrate=baudrate;
 	USART1_init.parity=usartOddParity;
 	USART_InitAsync(USART1, &USART1_init);
+	USART_BaudrateAsyncSet(USART1, 16000000, baudrate,usartOVS16);
 
 	    /* labak kivezetese a megfelelo portokra*/
 	USART1->ROUTE |= USART_ROUTE_LOCATION_LOC1 | USART_ROUTE_RXPEN;
@@ -365,7 +334,6 @@ void initUSART1(){
  * TIMER0 inicializalasa a hajo leptetesehez
  */
 void initTIMER0(){
-	CMU_ClockDivSet(cmuClock_HFPER, cmuClkDiv_1);
 	CMU_ClockEnable(cmuClock_TIMER0, true);
 	TIMER_Init_TypeDef TIMER0_Init = TIMER_INIT_DEFAULT;
 	TIMER0_Init.prescale=timerPrescale1024;
@@ -390,13 +358,15 @@ void initGPIO(){
 }
 
 void initTIMER1(){
-	CMU_ClockDivSet(cmuClock_HFPER, cmuClkDiv_1);
 	CMU_ClockEnable(cmuClock_TIMER1, true);
-	TIMER_Init_TypeDef TIMER1_Init = TIMER_INIT_DEFAULT;
-	TIMER1_Init.prescale=timerPrescale1024;
-	TIMER1_Init.enable=false;
+	TIMER_InitCC_TypeDef TIMER1_InitCC = TIMER_INITCC_DEFAULT;
+	TIMER1_InitCC.edge=timerEdgeFalling;
+	TIMER1_InitCC.mode=timerCCModeCapture;
+	TIMER_InitCC(TIMER1, 0, &TIMER1_InitCC);
+	TIMER1->ROUTE|=(1<<18); //Channel 4
+	TIMER1->ROUTE|=1; //CC Channel 0 Pin Enable
+	TIMER_Init_TypeDef TIMER1_Init=TIMER_INIT_DEFAULT;
 	TIMER_Init(TIMER1, &TIMER1_Init);
-	TIMER_TopSet(TIMER1, 2734);
 }
 
 void initADC(){
@@ -413,7 +383,7 @@ void initADC(){
 }
 
 /*
- * Engedelyezi a szukseges interruptokat (ADC interruptra nincs szukseg)
+ * Engedelyezi a szukseges interruptokat (ADC, USART(feltetelhez kotott) interruptra nincs szukseg)
  */
 void enableIntForAll(){
 	  TIMER_IntClear(TIMER0, TIMER_IF_OF);
@@ -421,8 +391,8 @@ void enableIntForAll(){
 	  NVIC_ClearPendingIRQ(TIMER0_IRQn);	//fuggoben levo torlese, automatikus a torlodese majd
 	  NVIC_EnableIRQ(TIMER0_IRQn); //NVIC törli magától a flaget, a periféria nem
 
-	  TIMER_IntClear(TIMER1, TIMER_IF_OF);
-	  TIMER_IntEnable(TIMER1, TIMER_IF_OF);
+	  TIMER_IntClear(TIMER1, TIMER_IF_ICBOF0);
+	  TIMER_IntEnable(TIMER1, TIMER_IF_ICBOF0);
 	  NVIC_ClearPendingIRQ(TIMER1_IRQn);	//fuggoben levo torlese, automatikus a torlodese majd
 	  NVIC_EnableIRQ(TIMER1_IRQn); //NVIC törli magától a flaget, a periféria nem
 
@@ -431,10 +401,7 @@ void enableIntForAll(){
 	  NVIC_ClearPendingIRQ(GPIO_ODD_IRQn);	//fuggoben levo torlese, automatikus a torlodese majd
 	  NVIC_EnableIRQ(GPIO_ODD_IRQn);
 
-	  USART_IntClear(USART1, _USART_IFC_MASK);	//fuggoben levo torlese, a periferiae nem torlodik automatikusan
-	  USART_IntEnable(USART1, USART_IEN_RXDATAV);
-	  NVIC_ClearPendingIRQ(USART1_RX_IRQn);	//fuggoben levo torlese, automatikus a torlodese majd
-	  NVIC_EnableIRQ(USART1_RX_IRQn);
+
 }
 
 

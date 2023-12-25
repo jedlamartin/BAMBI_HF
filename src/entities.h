@@ -22,6 +22,10 @@
 #define OBSTACLE_NUMBER 3
 #define TIMER_DEFAULT 27343
 volatile bool gameOver;
+volatile bool idle;
+long long int baudrate;
+
+
 
 
 typedef enum Direction{
